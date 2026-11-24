@@ -1,0 +1,6 @@
+{
+  "name": "CYBER DEFENSE — Proteja sua Smart Home",
+  "description": "Simulador educativo 3D de auditoria e defesa cibernética em residências inteligentes IoT.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
