@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ARCH, GRID_X, GRID_Z } from './architectureSpec';
 import { createCeramicVase, createOrganicPlant, createRoundedBoxGeometry } from './houseArchitecture';
 import { ProceduralTextureSet } from './proceduralTextures';
 
@@ -70,7 +71,6 @@ function buildCompositeCar(
   );
   roof.position.set(-0.2, 0.52 + height * 0.5 + cabinH * 0.82, 0);
 
-  // Headlights (+X front) & Taillights (-X back)
   [-0.58, 0.58].forEach((lz) => {
     const hl = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.12, 0.24), headlightMat);
     hl.position.set(length / 2, 0.54, lz);
@@ -109,7 +109,6 @@ function createTreeLOD(castShadows: boolean): THREE.LOD {
   const canopyMatA = new THREE.MeshStandardMaterial({ color: 0x4f7f56, roughness: 0.82 });
   const canopyMatB = new THREE.MeshStandardMaterial({ color: 0x629666, roughness: 0.8 });
 
-  // High detail (close)
   const high = new THREE.Group();
   const trunkH = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.22, 1.9, 10), trunkMat);
   trunkH.position.y = 0.95;
@@ -124,7 +123,6 @@ function createTreeLOD(castShadows: boolean): THREE.LOD {
   high.add(trunkH, c1, c2, c3);
   lod.addLevel(high, 0);
 
-  // Low detail (far)
   const low = new THREE.Group();
   const trunkL = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 1.85, 6), trunkMat);
   trunkL.position.y = 0.92;
@@ -143,6 +141,10 @@ export function buildExteriorAndStreet(
   const group = new THREE.Group();
   group.name = 'exterior-yard-pool-gourmet-street';
 
+  const FY = ARCH.FLOOR_Y; // 0.04m
+  const LAWN_TOP = -0.16; // lawn box center -0.21, height 0.10 -> [-0.26, -0.16]
+  const POOL_DECK_TOP = -0.06; // deck slab center -0.11, height 0.10 -> [-0.16, -0.06]
+
   const oakMat = new THREE.MeshStandardMaterial({ color: 0xc49f77, roughness: 0.56 });
   const darkMetalMat = new THREE.MeshStandardMaterial({ color: 0x262f3d, roughness: 0.38, metalness: 0.7 });
   const brushedSteelMat = new THREE.MeshStandardMaterial({ color: 0xb0b8c4, roughness: 0.25, metalness: 0.88 });
@@ -150,6 +152,7 @@ export function buildExteriorAndStreet(
   const stoneMat = new THREE.MeshStandardMaterial({ map: textures.stonePaver, roughness: 0.78 });
   const marbleMat = new THREE.MeshStandardMaterial({ map: textures.marble, roughness: 0.24 });
   const linenMat = new THREE.MeshStandardMaterial({ color: 0xede9e1, roughness: 0.9 });
+  const lawnMat = new THREE.MeshStandardMaterial({ map: textures.lawnGrass, roughness: 0.94 });
   const warmLedMat = new THREE.MeshStandardMaterial({
     color: 0xfff8eb,
     emissive: 0xfde68a,
@@ -157,68 +160,111 @@ export function buildExteriorAndStreet(
   });
 
   // =========================================================================
-  // 1. VAST LOT LAWN & NEIGHBORHOOD GROUND
+  // 1. NEIGHBORHOOD BASE & NON-OVERLAPPING PROPERTY LAWN ZONES
   // =========================================================================
   const neighborhoodGround = new THREE.Mesh(
-    new THREE.BoxGeometry(84, 0.24, 52),
+    new THREE.BoxGeometry(84, 0.18, 56),
     new THREE.MeshStandardMaterial({ color: 0xd5dfd0, roughness: 0.95 }),
   );
-  neighborhoodGround.position.set(0, -0.34, 1.5);
+  neighborhoodGround.position.set(0, -0.35, 1.5); // [-0.44, -0.26] strictly below all slabs
   neighborhoodGround.receiveShadow = true;
   group.add(neighborhoodGround);
 
-  const propertyLawn = new THREE.Mesh(
-    new THREE.BoxGeometry(27.5, 0.14, 27.2),
-    new THREE.MeshStandardMaterial({ map: textures.lawnGrass, roughness: 0.94 }),
-  );
-  propertyLawn.position.set(0, -0.25, -6.2);
-  propertyLawn.receiveShadow = true;
-  group.add(propertyLawn);
+  // Build property lawn as non-overlapping panels surrounding the house foundation & pool deck
+  const addLawnStrip = (minX: number, maxX: number, minZ: number, maxZ: number) => {
+    const w = maxX - minX;
+    const d = maxZ - minZ;
+    if (w <= 0.05 || d <= 0.05) return;
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, 0.1, d), lawnMat);
+    mesh.position.set((minX + maxX) / 2, -0.21, (minZ + maxZ) / 2);
+    mesh.receiveShadow = true;
+    mesh.userData.archCategory = 'lawn';
+    group.add(mesh);
+  };
+
+  // Backyard North strip behind pool terrace (-13.6..13.6, -19.6..-17.8)
+  addLawnStrip(-13.6, 13.6, -19.6, -17.8);
+  // Backyard West of pool (-13.6..-5.2, -17.8..-9.54)
+  addLawnStrip(-13.6, -5.2, -17.8, -9.54);
+  // Backyard East of pool (4.8..13.6, -17.8..-9.54)
+  addLawnStrip(4.8, 13.6, -17.8, -9.54);
+  // Backyard strip between pool South deck (-10.2) and house North line (-9.54)
+  addLawnStrip(-5.2, 4.8, -10.2, -9.54);
+  // West side yard (-13.6..-11.34, -9.54..7.25)
+  addLawnStrip(-13.6, GRID_X.WEST_EXT - 0.14, -9.54, 7.25);
+  // East side yard (11.34..13.6, -9.54..7.25)
+  addLawnStrip(GRID_X.EAST_EXT + 0.14, 13.6, -9.54, 7.25);
+  // Front West garden (-11.34..-5.60, 4.64..7.25)
+  addLawnStrip(GRID_X.WEST_EXT - 0.14, GRID_X.WEST_SPINE, GRID_Z.SOUTH_LIVING + 0.14, 7.25);
+  // Front Center-South strip around terrace & foyer (-5.60..5.80, 4.86..7.25)
+  addLawnStrip(GRID_X.WEST_SPINE, GRID_X.CENTER_SPINE, GRID_Z.SOUTH_HALL + 0.14, 7.25);
+  addLawnStrip(GRID_X.CENTER_SPINE, GRID_X.EAST_SPINE, 4.86, 7.25);
+  // Front of Garage strip (5.80..11.34, 6.54..7.25) excluding driveway (6.4..10.6)
+  addLawnStrip(GRID_X.EAST_SPINE, 6.4, GRID_Z.SOUTH_GARAGE + 0.14, 7.25);
+  addLawnStrip(10.6, GRID_X.EAST_EXT + 0.14, GRID_Z.SOUTH_GARAGE + 0.14, 7.25);
 
   // =========================================================================
-  // 2. QUINTAL: MUROS PERIMETRAIS, CERCAS DE MADEIRA, PORTÃO & CAMINHOS
+  // 2. QUINTAL: MUROS PERIMETRAIS, PORTAL DE ENTRADA & CAMINHOS
   // =========================================================================
-  // Backyard North, West, East Perimeter Walls (x: -13.6..13.6, z: -19.6..7.2)
-  const backWall = new THREE.Mesh(new THREE.BoxGeometry(27.4, 2.0, 0.26), wallFenceMat);
-  backWall.position.set(0, 0.8, -19.6);
+  const backWall = new THREE.Mesh(new THREE.BoxGeometry(27.46, 2.0, 0.26), wallFenceMat);
+  backWall.position.set(0, 0.84, -19.6);
   backWall.castShadow = castShadows;
   backWall.receiveShadow = true;
   const westWall = new THREE.Mesh(new THREE.BoxGeometry(0.26, 2.0, 26.8), wallFenceMat);
-  westWall.position.set(-13.6, 0.8, -6.2);
+  westWall.position.set(-13.6, 0.84, -6.2);
   westWall.receiveShadow = true;
   const eastWall = new THREE.Mesh(new THREE.BoxGeometry(0.26, 2.0, 26.8), wallFenceMat);
-  eastWall.position.set(13.6, 0.8, -6.2);
+  eastWall.position.set(13.6, 0.84, -6.2);
   eastWall.receiveShadow = true;
   group.add(backWall, westWall, eastWall);
 
-  // Front Boundary Wall + Pedestrian Gate + Driveway Apron (z = 7.25)
-  const frontWallLeft = new THREE.Mesh(new THREE.BoxGeometry(7.2, 1.35, 0.24), wallFenceMat);
-  frontWallLeft.position.set(-9.9, 0.5, 7.25);
-  const frontWallMid = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.35, 0.24), wallFenceMat);
-  frontWallMid.position.set(2.2, 0.5, 7.25);
-  const frontWallRight = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.35, 0.24), wallFenceMat);
-  frontWallRight.position.set(12.4, 0.5, 7.25);
-  const pedGate = new THREE.Mesh(new THREE.BoxGeometry(1.85, 1.45, 0.08), oakMat);
-  pedGate.position.set(-2.5, 0.55, 7.25);
-  group.add(frontWallLeft, frontWallMid, frontWallRight, pedGate);
+  // Front Boundary Wall (z = 7.25) with Architectural Entry Portal Arch (supports cam_street cleanly)
+  const frontWallLeft = new THREE.Mesh(new THREE.BoxGeometry(9.9, 1.35, 0.24), wallFenceMat);
+  frontWallLeft.position.set(-8.55, 0.52, 7.25);
+  const frontWallMid = new THREE.Mesh(new THREE.BoxGeometry(7.85, 1.35, 0.24), wallFenceMat);
+  frontWallMid.position.set(2.42, 0.52, 7.25);
+  const frontWallRight = new THREE.Mesh(new THREE.BoxGeometry(2.75, 1.35, 0.24), wallFenceMat);
+  frontWallRight.position.set(12.22, 0.52, 7.25);
 
-  // Driveway Paved Apron (Garage -> Street)
-  const driveway = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.1, 2.8), stoneMat);
-  driveway.position.set(8.5, -0.18, 7.7);
+  // Concrete Gate Portal Columns + Lintel Beam at x = -2.55 (z = 7.25)
+  const portalColL = new THREE.Mesh(new THREE.BoxGeometry(0.32, 2.68, 0.34), wallFenceMat);
+  portalColL.position.set(-3.55, 1.18, 7.25);
+  portalColL.castShadow = castShadows;
+  const portalColR = new THREE.Mesh(new THREE.BoxGeometry(0.32, 2.68, 0.34), wallFenceMat);
+  portalColR.position.set(-1.55, 1.18, 7.25);
+  portalColR.castShadow = castShadows;
+  const portalHeader = new THREE.Mesh(new THREE.BoxGeometry(2.42, 0.22, 0.42), darkMetalMat);
+  portalHeader.position.set(-2.55, 2.48, 7.25);
+  portalHeader.castShadow = castShadows;
+  const pedGate = new THREE.Mesh(new THREE.BoxGeometry(1.66, 1.9, 0.08), oakMat);
+  pedGate.position.set(-2.55, 0.82, 7.25);
+  group.add(
+    frontWallLeft,
+    frontWallMid,
+    frontWallRight,
+    portalColL,
+    portalColR,
+    portalHeader,
+    pedGate,
+  );
+
+  // Driveway Paved Apron (Flush from Garage South Threshold z=6.49 to Street Curb z=9.15)
+  const driveway = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.1, 2.66), stoneMat);
+  driveway.position.set(8.5, -0.14, 7.82);
   driveway.receiveShadow = true;
   group.add(driveway);
 
-  // Stepping Stones Path around Backyard & Garden (InstancedMesh)
-  const stepGeom = new THREE.BoxGeometry(0.78, 0.06, 0.54);
+  // Stepping Stones Path around Backyard & Entry Walkway (InstancedMesh)
+  const stepGeom = new THREE.BoxGeometry(0.78, 0.05, 0.54);
   const stepCoords: Array<[number, number]> = [
-    [-7.5, -10.5], [-7.5, -11.5], [-7.5, -12.5], [-7.5, -13.5],
-    [-6.6, -14.2], [6.8, -10.5], [6.8, -11.5], [6.8, -12.5],
-    [-2.5, 7.9], [-2.5, 8.6],
+    [-6.6, -10.4], [-6.6, -11.4], [-6.6, -12.4], [-6.6, -13.4],
+    [-5.8, -14.1], [6.8, -10.4], [6.8, -11.4], [6.8, -12.4],
+    [-2.55, 8.2], [-2.55, 8.85],
   ];
   const stepInst = new THREE.InstancedMesh(stepGeom, stoneMat, stepCoords.length);
   const dummy = new THREE.Object3D();
   stepCoords.forEach(([sx, sz], i) => {
-    dummy.position.set(sx, -0.16, sz);
+    dummy.position.set(sx, -0.155, sz);
     dummy.rotation.set(0, 0, 0);
     dummy.scale.set(1, 1, 1);
     dummy.updateMatrix();
@@ -230,83 +276,103 @@ export function buildExteriorAndStreet(
   group.add(stepInst);
 
   // =========================================================================
-  // 3. ÁREA GOURMET (x: 0.2 .. 5.6, z: -9.4 .. -5.0)
+  // 3. ÁREA GOURMET (x: 0.59..5.71, z: -9.40..-4.99) — Flush with House Grid!
   // =========================================================================
-  const gourmetDeck = new THREE.Mesh(
-    new THREE.BoxGeometry(5.6, 0.08, 4.5),
-    new THREE.MeshStandardMaterial({ map: textures.deckWood, roughness: 0.72 }),
-  );
-  gourmetDeck.position.set(2.85, 0.0, -7.2);
-  gourmetDeck.receiveShadow = true;
-  group.add(gourmetDeck);
-
-  // Timber & Steel Pergola Overhead
-  [-0.05, 5.55].forEach((px) => {
-    const col = new THREE.Mesh(new THREE.BoxGeometry(0.14, 2.75, 0.14), darkMetalMat);
-    col.position.set(px, 1.38, -9.25);
+  // Timber & Steel Pergola Overhead connecting cleanly to North Kitchen Wall ledger (z = -4.99)
+  [0.72, 5.58].forEach((px) => {
+    const col = new THREE.Mesh(new THREE.BoxGeometry(0.14, 2.76, 0.14), darkMetalMat);
+    col.position.set(px, FY + 1.38, -9.28);
     col.castShadow = castShadows;
     group.add(col);
   });
+  const pergolaOuterBeam = new THREE.Mesh(new THREE.BoxGeometry(5.16, 0.14, 0.14), darkMetalMat);
+  pergolaOuterBeam.position.set(3.15, 2.74, -9.28);
+  pergolaOuterBeam.castShadow = castShadows;
+  group.add(pergolaOuterBeam);
+
   for (let b = 0; b < 6; b++) {
-    const beam = new THREE.Mesh(new THREE.BoxGeometry(5.85, 0.1, 0.12), oakMat);
-    beam.position.set(2.75, 2.78, -5.2 - b * 0.8);
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.1, 4.38), oakMat);
+    beam.position.set(1.0 + b * 0.86, 2.81, -7.15);
     beam.castShadow = castShadows;
     group.add(beam);
   }
 
-  // Outdoor Gourmet Counter, Sink, Cabinets & Stainless BBQ Grill (Churrasqueira)
-  const gCounterBase = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.88, 0.76), wallFenceMat);
-  gCounterBase.position.set(2.8, 0.46, -8.85);
-  const gCounterTop = new THREE.Mesh(new THREE.BoxGeometry(3.48, 0.06, 0.82), marbleMat);
-  gCounterTop.position.set(2.8, 0.93, -8.85);
-  const bbqBody = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.42, 0.56), brushedSteelMat);
-  bbqBody.position.set(1.75, 1.15, -8.85);
-  const bbqChimney = new THREE.Mesh(new THREE.BoxGeometry(0.36, 1.25, 0.36), darkMetalMat);
-  bbqChimney.position.set(1.75, 2.0, -8.85);
-  const gSink = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.04, 0.42), brushedSteelMat);
-  gSink.position.set(3.45, 0.95, -8.85);
+  // Outdoor Gourmet Counter, Sink, Cabinets & Stainless BBQ Grill (grounded at FY = 0.04)
+  const gCounterBase = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.86, 0.72), wallFenceMat);
+  gCounterBase.position.set(3.15, FY + 0.43, -8.86);
+  const gCounterTop = new THREE.Mesh(new THREE.BoxGeometry(3.28, 0.06, 0.78), marbleMat);
+  gCounterTop.position.set(3.15, FY + 0.89, -8.86);
+  const bbqBody = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.4, 0.54), brushedSteelMat);
+  bbqBody.position.set(2.15, FY + 1.12, -8.86);
+  const bbqChimney = new THREE.Mesh(new THREE.BoxGeometry(0.34, 1.3, 0.34), darkMetalMat);
+  bbqChimney.position.set(2.15, FY + 1.97, -8.86);
+  const gSink = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.04, 0.4), brushedSteelMat);
+  gSink.position.set(3.65, FY + 0.91, -8.86);
 
   // Outdoor Dining Table + 4 Chairs
-  const gTableTop = new THREE.Mesh(createRoundedBoxGeometry(1.7, 0.06, 1.0, 0.03), oakMat);
-  gTableTop.position.set(2.8, 0.76, -6.95);
-  const gTableLeg = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.72, 0.65), darkMetalMat);
-  gTableLeg.position.set(2.8, 0.38, -6.95);
+  const gTableTop = new THREE.Mesh(createRoundedBoxGeometry(1.65, 0.06, 0.96, 0.03), oakMat);
+  gTableTop.position.set(3.15, FY + 0.72, -6.95);
+  const gTableLeg = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.7, 0.62), darkMetalMat);
+  gTableLeg.position.set(3.15, FY + 0.35, -6.95);
   gTableLeg.scale.x = 0.08;
-  [-0.5, 0.5].forEach((cx) => {
-    [-0.65, 0.65].forEach((cz) => {
-      const ch = new THREE.Mesh(createRoundedBoxGeometry(0.42, 0.46, 0.42, 0.03), linenMat);
-      ch.position.set(2.8 + cx, 0.25, -6.95 + cz);
+  [-0.48, 0.48].forEach((cx) => {
+    [-0.64, 0.64].forEach((cz) => {
+      const ch = new THREE.Mesh(createRoundedBoxGeometry(0.4, 0.44, 0.4, 0.03), linenMat);
+      ch.position.set(3.15 + cx, FY + 0.22, -6.95 + cz);
       group.add(ch);
     });
   });
   group.add(gCounterBase, gCounterTop, bbqBody, bbqChimney, gSink, gTableTop, gTableLeg);
 
   // =========================================================================
-  // 4. PISCINA MODERNA & ESPRIGUIÇADEIRAS (x: -5.2 .. 4.8, z: -15.8 .. -10.2)
+  // 4. PISCINA MODERNA & ESPRIGUIÇADEIRAS (Deck em 4 lajes ao redor da bacia real!)
   // =========================================================================
-  const poolDeck = new THREE.Mesh(new THREE.BoxGeometry(10.8, 0.12, 6.2), stoneMat);
-  poolDeck.position.set(-0.2, -0.14, -13.0);
-  poolDeck.receiveShadow = true;
+  // Pool interior opening: x [-3.60, 3.20] (6.80m), z [-14.90, -11.10] (3.80m)
+  // Surrounding Stone Deck Perimeter: x [-5.20, 4.80], z [-17.80, -10.20]
+  const addPoolDeckSlab = (minX: number, maxX: number, minZ: number, maxZ: number) => {
+    const w = maxX - minX;
+    const d = maxZ - minZ;
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(w, 0.1, d), stoneMat);
+    slab.position.set((minX + maxX) / 2, POOL_DECK_TOP - 0.05, (minZ + maxZ) / 2);
+    slab.receiveShadow = true;
+    slab.userData.archCategory = 'deck';
+    group.add(slab);
+  };
+  // North deck apron (extended to -17.8 so sun loungers sit 100% on stone!)
+  addPoolDeckSlab(-5.2, 4.8, -17.8, -14.9);
+  // South deck apron
+  addPoolDeckSlab(-5.2, 4.8, -11.1, -10.2);
+  // West deck strip
+  addPoolDeckSlab(-5.2, -3.6, -14.9, -11.1);
+  // East deck strip
+  addPoolDeckSlab(3.2, 4.8, -14.9, -11.1);
 
-  // Pool Mosaic Basin
-  const poolBasin = new THREE.Mesh(
-    new THREE.BoxGeometry(6.8, 0.08, 3.8),
-    new THREE.MeshStandardMaterial({ map: textures.poolMosaic, roughness: 0.35 }),
-  );
-  poolBasin.position.set(-0.2, -0.22, -13.0);
+  // Recessed Pool Mosaic Basin Floor & Inner Walls (100% visible, NEVER occluded by deck!)
+  const poolTileMat = new THREE.MeshStandardMaterial({ map: textures.poolMosaic, roughness: 0.32 });
+  const poolBasinFloor = new THREE.Mesh(new THREE.BoxGeometry(6.8, 0.06, 3.8), poolTileMat);
+  poolBasinFloor.position.set(-0.2, -0.22, -13.0);
+  const poolWallN = new THREE.Mesh(new THREE.BoxGeometry(6.8, 0.16, 0.08), poolTileMat);
+  poolWallN.position.set(-0.2, -0.14, -14.86);
+  const poolWallS = new THREE.Mesh(new THREE.BoxGeometry(6.8, 0.16, 0.08), poolTileMat);
+  poolWallS.position.set(-0.2, -0.14, -11.14);
+  const poolWallW = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.16, 3.64), poolTileMat);
+  poolWallW.position.set(-3.56, -0.14, -13.0);
+  const poolWallE = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.16, 3.64), poolTileMat);
+  poolWallE.position.set(3.16, -0.14, -13.0);
+  group.add(poolBasinFloor, poolWallN, poolWallS, poolWallW, poolWallE);
 
-  // Stone Coping Rim around Pool
+  // Mitered Stone Coping Rim around Pool Opening
   const copingMat = new THREE.MeshStandardMaterial({ color: 0xe7e3dc, roughness: 0.65 });
-  const rimN = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.14, 0.28), copingMat);
-  rimN.position.set(-0.2, -0.05, -15.0);
-  const rimS = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.14, 0.28), copingMat);
-  rimS.position.set(-0.2, -0.05, -11.0);
-  const rimW = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.14, 4.28), copingMat);
-  rimW.position.set(-3.7, -0.05, -13.0);
-  const rimE = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.14, 4.28), copingMat);
-  rimE.position.set(3.3, -0.05, -13.0);
+  const rimN = new THREE.Mesh(new THREE.BoxGeometry(7.36, 0.06, 0.28), copingMat);
+  rimN.position.set(-0.2, POOL_DECK_TOP + 0.03, -15.04);
+  const rimS = new THREE.Mesh(new THREE.BoxGeometry(7.36, 0.06, 0.28), copingMat);
+  rimS.position.set(-0.2, POOL_DECK_TOP + 0.03, -10.96);
+  const rimW = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.06, 3.8), copingMat);
+  rimW.position.set(-3.74, POOL_DECK_TOP + 0.03, -13.0);
+  const rimE = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.06, 3.8), copingMat);
+  rimE.position.set(3.34, POOL_DECK_TOP + 0.03, -13.0);
 
-  // Realistic Refractive Animated Water Surface
+  // Refractive Animated Water Surface
   const poolWaterMat = new THREE.MeshPhysicalMaterial({
     color: 0x38bdf8,
     normalMap: textures.poolWaterNormal,
@@ -314,17 +380,17 @@ export function buildExteriorAndStreet(
     roughness: 0.08,
     metalness: 0.05,
     transparent: true,
-    opacity: 0.78,
+    opacity: 0.72,
     clearcoat: 1.0,
   });
-  const poolWater = new THREE.Mesh(new THREE.PlaneGeometry(6.75, 3.75), poolWaterMat);
+  const poolWater = new THREE.Mesh(new THREE.PlaneGeometry(6.64, 3.64), poolWaterMat);
   poolWater.rotation.x = -Math.PI / 2;
-  poolWater.position.set(-0.2, -0.06, -13.0);
+  poolWater.position.set(-0.2, -0.09, -13.0);
 
-  // Underwater Pool LED Strip Lights
+  // Underwater Pool LED Lights mounted cleanly along North mosaic wall
   [-1.8, 0, 1.8].forEach((lx) => {
     const pLed = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.08, 0.08, 0.03, 14),
+      new THREE.CylinderGeometry(0.075, 0.075, 0.03, 14),
       new THREE.MeshStandardMaterial({
         color: 0x7dd3fc,
         emissive: 0x0ea5e9,
@@ -332,51 +398,55 @@ export function buildExteriorAndStreet(
       }),
     );
     pLed.rotation.x = Math.PI / 2;
-    pLed.position.set(-0.2 + lx, -0.14, -14.84);
+    pLed.position.set(-0.2 + lx, -0.14, -14.8);
     group.add(pLed);
   });
 
-  // 3 Sun Loungers (Espreguiçadeiras) & Side Tables
+  // 3 Sun Loungers grounded flush on the North Stone Pool Terrace (POOL_DECK_TOP = -0.06)
   [-2.2, -0.2, 1.8].forEach((lx) => {
-    const lBase = new THREE.Mesh(createRoundedBoxGeometry(0.76, 0.14, 1.75, 0.03), oakMat);
-    lBase.position.set(lx, 0.02, -16.85);
-    const lPad = new THREE.Mesh(createRoundedBoxGeometry(0.68, 0.08, 1.2, 0.03), linenMat);
-    lPad.position.set(lx, 0.12, -16.65);
-    const lBack = new THREE.Mesh(createRoundedBoxGeometry(0.68, 0.08, 0.62, 0.03), linenMat);
-    lBack.position.set(lx, 0.3, -17.42);
+    const lBase = new THREE.Mesh(createRoundedBoxGeometry(0.74, 0.14, 1.7, 0.03), oakMat);
+    lBase.position.set(lx, POOL_DECK_TOP + 0.07, -16.45);
+    const lPad = new THREE.Mesh(createRoundedBoxGeometry(0.66, 0.08, 1.16, 0.03), linenMat);
+    lPad.position.set(lx, POOL_DECK_TOP + 0.17, -16.25);
+    const lBack = new THREE.Mesh(createRoundedBoxGeometry(0.66, 0.08, 0.6, 0.03), linenMat);
+    lBack.position.set(lx, POOL_DECK_TOP + 0.35, -17.0);
     lBack.rotation.x = 0.5;
     group.add(lBase, lPad, lBack);
   });
   const poolVase = createCeramicVase(0.28, 0.1, 0xd8d2c7);
-  poolVase.position.set(4.1, -0.06, -10.8);
-  group.add(poolDeck, poolBasin, rimN, rimS, rimW, rimE, poolWater, poolVase);
+  poolVase.position.set(4.1, POOL_DECK_TOP, -10.75);
+  // Equipment pedestal totem supporting pool_ctrl ([4.35, 0.30, -14.2]) flush on East stone deck
+  const poolCtrlBase = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.06, 0.42), copingMat);
+  poolCtrlBase.position.set(4.52, POOL_DECK_TOP + 0.03, -14.2);
+  const poolCtrlPost = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.72, 0.34), darkMetalMat);
+  poolCtrlPost.position.set(4.52, POOL_DECK_TOP + 0.39, -14.2);
+  poolCtrlPost.castShadow = castShadows;
+  group.add(rimN, rimS, rimW, rimE, poolWater, poolVase, poolCtrlBase, poolCtrlPost);
 
   // =========================================================================
   // 5. VEGETAÇÃO OTIMIZADA (InstancedMesh + LOD) & LUZES DE JARDIM
   // =========================================================================
-  // Instanced Ornamental Shrubs & Flower Clusters across Yard & Street
   const shrubGeom = new THREE.DodecahedronGeometry(0.42, 1);
   const shrubMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.84 });
   const shrubPlacements: Array<[number, number, number, number, number]> = [
-    [-12.4, 0.15, -18.2, 1.2, 0x4c7c59],
-    [-11.2, 0.15, -18.4, 0.95, 0x5c8f68],
-    [-9.5, 0.15, -18.3, 1.1, 0x3f6b4b],
-    [9.8, 0.15, -18.2, 1.25, 0x4c7c59],
-    [11.4, 0.15, -18.1, 1.0, 0x679c73],
-    [12.4, 0.15, -16.2, 1.15, 0x4c7c59],
-    [12.3, 0.15, -12.8, 1.0, 0x5c8f68],
-    [-12.4, 0.15, -13.5, 1.1, 0x5c8f68],
-    [-12.4, 0.15, -10.8, 0.9, 0x679c73],
-    [-12.2, 0.15, 5.8, 0.95, 0x4c7c59],
-    [-10.8, 0.15, 6.2, 0.85, 0x5c8f68],
-    [-7.8, 0.15, 6.2, 0.9, 0x4c7c59],
-    [1.2, 0.15, 6.4, 0.85, 0x5c8f68],
-    [4.4, 0.15, 6.4, 0.9, 0x4c7c59],
-    // Flowering accent shrubs near pool & patio
-    [-6.2, 0.1, -17.2, 0.65, 0xd97777],
-    [5.6, 0.1, -17.2, 0.65, 0xeab308],
-    [-5.8, 0.1, -11.5, 0.62, 0xd97777],
-    [5.6, 0.1, -11.8, 0.62, 0xeab308],
+    [-12.4, LAWN_TOP + 0.32, -18.4, 1.15, 0x4c7c59],
+    [-11.2, LAWN_TOP + 0.28, -18.5, 0.95, 0x5c8f68],
+    [-9.5, LAWN_TOP + 0.3, -18.4, 1.08, 0x3f6b4b],
+    [9.8, LAWN_TOP + 0.32, -18.4, 1.2, 0x4c7c59],
+    [11.4, LAWN_TOP + 0.28, -18.3, 1.0, 0x679c73],
+    [12.4, LAWN_TOP + 0.3, -16.2, 1.1, 0x4c7c59],
+    [12.3, LAWN_TOP + 0.28, -12.8, 0.95, 0x5c8f68],
+    [-12.4, LAWN_TOP + 0.3, -13.5, 1.05, 0x5c8f68],
+    [-12.4, LAWN_TOP + 0.26, -10.8, 0.88, 0x679c73],
+    [-12.2, LAWN_TOP + 0.28, 5.8, 0.92, 0x4c7c59],
+    [-10.8, LAWN_TOP + 0.26, 6.2, 0.85, 0x5c8f68],
+    [-7.8, LAWN_TOP + 0.28, 6.2, 0.88, 0x4c7c59],
+    [1.2, LAWN_TOP + 0.26, 6.4, 0.84, 0x5c8f68],
+    [4.4, LAWN_TOP + 0.28, 6.4, 0.88, 0x4c7c59],
+    [-6.2, LAWN_TOP + 0.22, -17.2, 0.65, 0xd97777],
+    [5.6, LAWN_TOP + 0.22, -17.2, 0.65, 0xeab308],
+    [-5.8, LAWN_TOP + 0.22, -11.5, 0.62, 0xd97777],
+    [5.6, LAWN_TOP + 0.22, -11.8, 0.62, 0xeab308],
   ];
   const shrubInst = new THREE.InstancedMesh(shrubGeom, shrubMat, shrubPlacements.length);
   const tintColor = new THREE.Color();
@@ -395,18 +465,18 @@ export function buildExteriorAndStreet(
   shrubInst.castShadow = castShadows;
   group.add(shrubInst);
 
-  // LOD Trees in Backyard & Sidewalks
+  // LOD Trees grounded cleanly on lawn/sidewalk
   [
-    [-11.8, -0.2, -16.5],
-    [11.8, -0.2, -16.8],
-    [-12.2, -0.2, 2.5],
-    [-14.5, -0.2, 8.2],
-    [-5.5, -0.2, 8.2],
-    [12.8, -0.2, 8.2],
-    [22.0, -0.2, 8.2],
-    [-16.0, -0.2, 16.6],
-    [0.0, -0.2, 16.6],
-    [16.0, -0.2, 16.6],
+    [-11.8, LAWN_TOP, -16.5],
+    [11.8, LAWN_TOP, -16.8],
+    [-12.4, LAWN_TOP, 2.5],
+    [-14.5, -0.1, 8.2],
+    [-5.5, -0.1, 8.2],
+    [12.8, -0.1, 8.2],
+    [22.0, -0.1, 8.2],
+    [-16.0, -0.1, 16.6],
+    [0.0, -0.1, 16.6],
+    [16.0, -0.1, 16.6],
   ].forEach(([tx, ty, tz]) => {
     const tree = createTreeLOD(castShadows);
     tree.position.set(tx, ty, tz);
@@ -415,12 +485,12 @@ export function buildExteriorAndStreet(
 
   // Garden Pathway Bollards
   [
-    [-7.8, -0.18, -11.0],
-    [-7.8, -0.18, -14.0],
-    [6.6, -0.18, -11.0],
-    [6.6, -0.18, -14.0],
-    [1.15, 0.06, 4.18],
-    [5.35, 0.06, 4.18],
+    [-7.6, LAWN_TOP, -11.0],
+    [-7.6, LAWN_TOP, -14.0],
+    [6.6, LAWN_TOP, -11.0],
+    [6.6, LAWN_TOP, -14.0],
+    [1.15, FY, 4.18],
+    [5.35, FY, 4.18],
   ].forEach(([bx, by, bz]) => {
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.065, 0.62, 12), darkMetalMat);
     post.position.set(bx, by + 0.31, bz);
@@ -428,28 +498,26 @@ export function buildExteriorAndStreet(
     lantern.position.set(bx, by + 0.54, bz);
     group.add(post, lantern);
   });
-  group.add(createOrganicPlant(-0.3, -0.1, 5.1, 1.15, 0x8b7e74, castShadows));
+  group.add(createOrganicPlant(0.0, LAWN_TOP, 5.25, 1.05, 0x8b7e74, castShadows));
 
   // =========================================================================
   // 6. RUA PÚBLICA 3D, CALÇADAS, BAIRRO VIZINHO & POSTES DE ILUMINAÇÃO
   // =========================================================================
   const streetLength = 74;
-  // Sidewalks & Curbs (Near Side z=8.35, Far Side z=16.55)
   const nearSidewalk = new THREE.Mesh(
     new THREE.BoxGeometry(streetLength, 0.16, 1.65),
     new THREE.MeshStandardMaterial({ map: textures.sidewalkPaver, roughness: 0.85 }),
   );
-  nearSidewalk.position.set(0, -0.16, 8.35);
+  nearSidewalk.position.set(0, -0.18, 8.35);
   nearSidewalk.receiveShadow = true;
 
   const farSidewalk = new THREE.Mesh(
     new THREE.BoxGeometry(streetLength, 0.16, 1.65),
     new THREE.MeshStandardMaterial({ map: textures.sidewalkPaver, roughness: 0.85 }),
   );
-  farSidewalk.position.set(0, -0.16, 16.55);
+  farSidewalk.position.set(0, -0.18, 16.55);
   farSidewalk.receiveShadow = true;
 
-  // Asphalt 2-Lane Road (z: 9.15 .. 15.75)
   const asphalt = new THREE.Mesh(
     new THREE.BoxGeometry(streetLength, 0.08, 6.6),
     new THREE.MeshStandardMaterial({ map: textures.asphaltRoad, roughness: 0.88 }),
@@ -458,12 +526,11 @@ export function buildExteriorAndStreet(
   asphalt.receiveShadow = true;
   group.add(nearSidewalk, farSidewalk, asphalt);
 
-  // Pedestrian Crosswalk Stripes (Faixa de Pedestres at x = -4.2)
   const stripeMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.7 });
   const stripeGeom = new THREE.BoxGeometry(1.5, 0.015, 0.42);
   const crosswalkInst = new THREE.InstancedMesh(stripeGeom, stripeMat, 7);
   for (let s = 0; s < 7; s++) {
-    dummy.position.set(-4.2, -0.175, 9.75 + s * 0.9);
+    dummy.position.set(-4.2, -0.172, 9.75 + s * 0.9);
     dummy.scale.set(1, 1, 1);
     dummy.rotation.set(0, 0, 0);
     dummy.updateMatrix();
@@ -473,30 +540,27 @@ export function buildExteriorAndStreet(
   crosswalkInst.computeBoundingSphere();
   group.add(crosswalkInst);
 
-  // Storm Drains (Bueiros) + Traffic Signs + Streetlights
   [-11.0, 11.5].forEach((bx) => {
     const drain = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.03, 0.42), darkMetalMat);
     drain.position.set(bx, -0.17, 9.35);
     group.add(drain);
   });
 
-  // Traffic Sign (Speed Limit / Crosswalk)
   const signPost = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.3, 10), brushedSteelMat);
-  signPost.position.set(-6.2, 1.0, 8.85);
+  signPost.position.set(-6.2, 1.05, 8.85);
   const signFace = new THREE.Mesh(
     new THREE.CylinderGeometry(0.28, 0.28, 0.03, 20),
     new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.4 }),
   );
   signFace.rotation.x = Math.PI / 2;
-  signFace.position.set(-6.2, 2.05, 8.85);
+  signFace.position.set(-6.2, 2.1, 8.85);
   const signRim = new THREE.Mesh(
     new THREE.TorusGeometry(0.26, 0.03, 8, 20),
     new THREE.MeshStandardMaterial({ color: 0xd94a4a, roughness: 0.45 }),
   );
-  signRim.position.set(-6.2, 2.05, 8.87);
+  signRim.position.set(-6.2, 2.1, 8.87);
   group.add(signPost, signFace, signRim);
 
-  // Public Streetlights along sidewalks
   [
     [-18.0, 8.05, 0],
     [0.5, 8.05, 0],
@@ -517,10 +581,9 @@ export function buildExteriorAndStreet(
     group.add(lamp);
   });
 
-  // Neighboring Residential Facades (Left, Right, Across the Street for Urban Continuity)
   const addNeighborHouse = (x: number, z: number, rotY: number, wallHex: number, roofHex: number) => {
     const nh = new THREE.Group();
-    nh.position.set(x, -0.2, z);
+    nh.position.set(x, -0.26, z);
     nh.rotation.y = rotY;
     const body = new THREE.Mesh(
       new THREE.BoxGeometry(8.6, 3.3, 6.2),
@@ -551,7 +614,7 @@ export function buildExteriorAndStreet(
   addNeighborHouse(20.0, 22.5, Math.PI, 0xebeef2, 0x475569);
 
   // =========================================================================
-  // 7. SISTEMA DE TRÁFICO SIMULADO (6 VEÍCULOS COM COLISÃO E GIRO DE RODAS)
+  // 7. SISTEMA DE TRÁFICO SIMULADO
   // =========================================================================
   const vehicleSpecs: Array<{
     lane: 1 | -1;
@@ -590,13 +653,11 @@ export function buildExteriorAndStreet(
   const ROAD_SPAN = ROAD_MAX_X - ROAD_MIN_X;
 
   const updateTraffic = (delta: number, elapsed: number, reducedMotion: boolean) => {
-    // Animate subtle pool water ripples
     textures.poolWaterNormal.offset.x = (elapsed * 0.03) % 1;
     textures.poolWaterNormal.offset.y = (elapsed * 0.02) % 1;
 
     if (reducedMotion) return;
 
-    // Safe following-distance traffic solver (zero GC allocations)
     for (let i = 0; i < vehicles.length; i++) {
       const v = vehicles[i];
       let targetSpeed = v.baseSpeed;
@@ -618,7 +679,6 @@ export function buildExteriorAndStreet(
       if (v.x < ROAD_MIN_X) v.x += ROAD_SPAN;
 
       v.mesh.position.x = v.x;
-      // Rotate wheels proportionally to travel distance (radius = 0.32m)
       const wheelSpin = (v.currentSpeed * delta) / 0.32;
       for (let w = 0; w < v.wheels.length; w++) {
         v.wheels[w].rotation.y -= wheelSpin;

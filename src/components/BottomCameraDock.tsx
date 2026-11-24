@@ -1,25 +1,54 @@
-import { Eye, EyeOff, Layers, Map as MapIcon, Network, RotateCcw } from 'lucide-react';
+import { Eye, EyeOff, Home, Layers, Map as MapIcon, Network, RotateCcw } from 'lucide-react';
 import { ROOMS } from '../data/smartHomeData';
 import { useGameStore } from '../store/useGameStore';
-import { RoomId } from '../types/game';
+import { ArchitecturalViewMode, RoomId } from '../types/game';
 
 const QUICK_ROOM_IDS: RoomId[] = ['living_room', 'office', 'garage', 'pool', 'street'];
+
+const VIEW_MODES: Array<{ id: ArchitecturalViewMode; label: string; title: string }> = [
+  { id: 'full', label: 'Casa completa', title: 'Exibir cobertura, forro e arquitetura completa' },
+  { id: 'no_roof', label: 'Sem cobertura', title: 'Corte arquitetônico sem telhado para visualizar cômodos' },
+  { id: 'interior', label: 'Interna', title: 'Visualização aproximada dos ambientes internos' },
+  { id: 'overview', label: 'Visão geral', title: 'Visão aérea completa da propriedade' },
+];
 
 export function BottomCameraDock() {
   const cameraFocusRoom = useGameStore((s) => s.cameraFocusRoom);
   const showNetworkLinks = useGameStore((s) => s.showNetworkLinks);
   const showVulnerabilityOverlay = useGameStore((s) => s.showVulnerabilityOverlay);
   const zenMode = useGameStore((s) => s.zenMode);
+  const architecturalViewMode = useGameStore((s) => s.architecturalViewMode);
   const focusCameraRoom = useGameStore((s) => s.focusCameraRoom);
   const triggerCameraReset = useGameStore((s) => s.triggerCameraReset);
   const toggleNetworkLinks = useGameStore((s) => s.toggleNetworkLinks);
   const toggleVulnerabilityOverlay = useGameStore((s) => s.toggleVulnerabilityOverlay);
   const toggleZenMode = useGameStore((s) => s.toggleZenMode);
+  const setArchitecturalViewMode = useGameStore((s) => s.setArchitecturalViewMode);
   const setActiveModal = useGameStore((s) => s.setActiveModal);
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 flex justify-center px-3">
       <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-1.5 rounded-xl border border-[#E9EDF2] bg-white/95 px-2.5 py-1.5 shadow-md">
+        <div className="flex items-center gap-1 rounded-lg border border-[#E9EDF2] bg-[#F8FAFC] p-0.5">
+          <Home className="ml-1.5 h-3.5 w-3.5 text-[#315EAA]" aria-hidden="true" />
+          <label className="sr-only" htmlFor="arch-view-mode-select">
+            Modo de visualização arquitetônica
+          </label>
+          <select
+            id="arch-view-mode-select"
+            value={architecturalViewMode}
+            onChange={(e) => setArchitecturalViewMode(e.target.value as ArchitecturalViewMode)}
+            title="Alternar modo arquitetônico (Casa completa, Sem cobertura, Interna, Visão geral)"
+            className="h-7 rounded-md bg-transparent px-1.5 text-xs font-semibold text-[#18212F] outline-none"
+          >
+            {VIEW_MODES.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <button
           type="button"
           onClick={() => focusCameraRoom('overview')}

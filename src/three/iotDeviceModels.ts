@@ -188,7 +188,11 @@ export function createIoTDeviceMesh(
     }
 
     case 'tv': {
-      const frame = new THREE.Mesh(new THREE.BoxGeometry(2.12, 1.18, 0.055), matteAnthracite);
+      const tvScale = config.id === 'tv_guest' ? 0.54 : 1.0;
+      const frame = new THREE.Mesh(
+        new THREE.BoxGeometry(2.12 * tvScale, 1.18 * tvScale, 0.055),
+        matteAnthracite,
+      );
       const screenMat = new THREE.MeshStandardMaterial({
         map: textures.tvScreen,
         emissiveMap: textures.tvScreen,
@@ -197,21 +201,24 @@ export function createIoTDeviceMesh(
         roughness: 0.12,
         metalness: 0.06,
       });
-      const screen = new THREE.Mesh(new THREE.PlaneGeometry(2.02, 1.08), screenMat);
+      const screen = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.02 * tvScale, 1.08 * tvScale),
+        screenMat,
+      );
       screen.position.z = 0.03;
       const soundbar = new THREE.Mesh(
-        new THREE.BoxGeometry(1.25, 0.075, 0.09),
+        new THREE.BoxGeometry(1.25 * tvScale, 0.075 * tvScale, 0.09),
         matteAnthracite,
       );
-      soundbar.position.set(0, -0.68, 0.035);
+      soundbar.position.set(0, -0.68 * tvScale, 0.035);
       const led = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.015, 0.015), ledMat);
-      led.position.set(0, -0.575, 0.035);
+      led.position.set(0, -0.575 * tvScale, 0.035);
 
       modelGroup.add(frame, screen, soundbar, led);
-      beaconY = 0.82;
-      ringY = -0.78;
-      ringScale = 1.1;
-      hitboxSize = [2.2, 1.4, 0.65];
+      beaconY = 0.82 * tvScale + 0.15;
+      ringY = -0.78 * tvScale;
+      ringScale = 1.1 * tvScale;
+      hitboxSize = [2.2 * tvScale, 1.4 * tvScale, 0.65];
       break;
     }
 
@@ -580,23 +587,23 @@ export function createIoTDeviceMesh(
     }
 
     case 'garage_gate': {
-      // Overhead sectional motorized garage door + motor controller box
-      const doorFrame = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.25, 0.1), matteAnthracite);
+      // Overhead sectional motorized garage door + interior wall controller box
+      const doorFrame = new THREE.Mesh(new THREE.BoxGeometry(3.68, 2.2, 0.1), matteAnthracite);
       for (let p = 0; p < 4; p++) {
         const panel = new THREE.Mesh(
-          new THREE.BoxGeometry(3.42, 0.48, 0.12),
+          new THREE.BoxGeometry(3.54, 0.48, 0.12),
           walnutMat,
         );
-        panel.position.set(0, -0.8 + p * 0.54, 0.01);
+        panel.position.set(0, -0.78 + p * 0.52, 0.01);
         modelGroup.add(panel);
       }
-      const ctrlBox = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.32, 0.1), brushedAluminum);
-      ctrlBox.position.set(-1.95, -0.1, 0.08);
+      const ctrlBox = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.32, 0.09), brushedAluminum);
+      ctrlBox.position.set(-2.06, -0.05, -0.14);
       const led = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.025, 0.02), ledMat);
-      led.position.set(-1.95, 0.0, 0.14);
+      led.position.set(-2.06, 0.05, -0.19);
       modelGroup.add(doorFrame, ctrlBox, led);
       beaconY = 1.45;
-      ringY = -1.12;
+      ringY = -1.1;
       ringScale = 1.6;
       hitboxSize = [3.8, 2.35, 0.75];
       break;

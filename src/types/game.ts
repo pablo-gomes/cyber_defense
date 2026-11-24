@@ -194,3 +194,5 @@ export interface AssistantMessage {
 }
 
 export type AppScreen = 'start' | 'playing' | 'report';
+
+export type ArchitecturalViewMode = 'full' | 'no_roof' | 'interior' | 'overview';

@@ -91,6 +91,7 @@ export function SmartHomeCanvas({ onLoaded, onLoadProgress }: SmartHomeCanvasPro
   const deviceStates = useGameStore((s) => s.deviceStates);
   const showNetworkLinks = useGameStore((s) => s.showNetworkLinks);
   const showVulnerabilityOverlay = useGameStore((s) => s.showVulnerabilityOverlay);
+  const architecturalViewMode = useGameStore((s) => s.architecturalViewMode);
   const settings = useGameStore((s) => s.settings);
 
   const stateRef = useRef({
@@ -99,6 +100,7 @@ export function SmartHomeCanvas({ onLoaded, onLoadProgress }: SmartHomeCanvasPro
     deviceStates,
     showNetworkLinks,
     showVulnerabilityOverlay,
+    architecturalViewMode,
     reducedMotion: settings.reducedMotion,
     graphicsQuality: settings.graphicsQuality,
     soundEnabled: settings.soundEnabled,
@@ -109,6 +111,7 @@ export function SmartHomeCanvas({ onLoaded, onLoadProgress }: SmartHomeCanvasPro
     deviceStates,
     showNetworkLinks,
     showVulnerabilityOverlay,
+    architecturalViewMode,
     reducedMotion: settings.reducedMotion,
     graphicsQuality: settings.graphicsQuality,
     soundEnabled: settings.soundEnabled,
@@ -258,7 +261,13 @@ export function SmartHomeCanvas({ onLoaded, onLoadProgress }: SmartHomeCanvasPro
         new THREE.MeshBasicMaterial({ visible: false }),
       );
       floorPick.rotation.x = -Math.PI / 2;
-      floorPick.position.set(cx, room.zone === 'outdoor' ? -0.02 : 0.08, cz);
+      const pickY =
+        room.zone !== 'outdoor'
+          ? 0.08
+          : room.id === 'exterior' || room.id === 'gourmet'
+            ? 0.06
+            : -0.02;
+      floorPick.position.set(cx, pickY, cz);
       floorPick.layers.set(2);
       floorPick.userData.roomId = room.id;
       roomFloorMeshes.push(floorPick);
@@ -557,6 +566,11 @@ export function SmartHomeCanvas({ onLoaded, onLoadProgress }: SmartHomeCanvasPro
               : 0.45;
         }
       }
+
+      const showRoof = current.architecturalViewMode === 'full';
+      architecture.roofGroup.visible = showRoof;
+      architecture.ceilingGroup.visible = showRoof;
+      architecture.wallCapGroup.visible = !showRoof;
 
       if (!current.reducedMotion) {
         architecture.fireplaceGlowMat.emissiveIntensity = 1.2 + Math.sin(elapsed * 5.0) * 0.18;

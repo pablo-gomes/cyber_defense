@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { SMART_DEVICES } from '../data/smartHomeData';
 import {
   AppScreen,
+  ArchitecturalViewMode,
   AssistantMessage,
   DecisionLogEntry,
   DeviceRuntimeState,
@@ -26,6 +27,7 @@ interface GameStoreState {
   showNetworkLinks: boolean;
   showVulnerabilityOverlay: boolean;
   zenMode: boolean;
+  architecturalViewMode: ArchitecturalViewMode;
 
   deviceStates: Record<string, DeviceRuntimeState>;
   decisionLog: DecisionLogEntry[];
@@ -71,6 +73,7 @@ interface GameStoreState {
   toggleNetworkLinks: () => void;
   toggleVulnerabilityOverlay: () => void;
   toggleZenMode: () => void;
+  setArchitecturalViewMode: (mode: ArchitecturalViewMode) => void;
 
   startInvestigation: (deviceId: string) => void;
   revealNextClue: (deviceId: string) => void;
@@ -161,6 +164,7 @@ export const useGameStore = create<GameStoreState>()(
       showNetworkLinks: false,
       showVulnerabilityOverlay: true,
       zenMode: false,
+      architecturalViewMode: 'no_roof',
 
       deviceStates: createInitialDeviceStates(),
       decisionLog: [],
@@ -281,6 +285,26 @@ export const useGameStore = create<GameStoreState>()(
       toggleZenMode: () => {
         soundEngine.playSelect();
         set((state) => ({ zenMode: !state.zenMode }));
+      },
+
+      setArchitecturalViewMode: (mode) => {
+        soundEngine.playSelect();
+        set((state) => {
+          if (mode === 'overview') {
+            return {
+              architecturalViewMode: mode,
+              cameraFocusRoom: 'overview',
+              cameraResetNonce: state.cameraResetNonce + 1,
+            };
+          }
+          if (mode === 'interior' && state.cameraFocusRoom === 'overview') {
+            return {
+              architecturalViewMode: mode,
+              cameraFocusRoom: 'living_room',
+            };
+          }
+          return { architecturalViewMode: mode };
+        });
       },
 
       startInvestigation: (deviceId) => {
